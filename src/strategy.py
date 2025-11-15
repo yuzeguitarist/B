@@ -6,6 +6,8 @@ import numpy as np
 from typing import Dict, Tuple, Optional
 from enum import Enum
 import logging
+from .funding_rate import FundingRateMonitor
+from .long_short_ratio import LongShortRatioMonitor
 
 logger = logging.getLogger(__name__)
 
@@ -34,14 +36,22 @@ class TrendType(Enum):
 class TradingStrategy:
     """交易策略决策引擎"""
 
-    def __init__(self, config: dict = None):
+    def __init__(self, config: dict = None, symbol: str = "BTC/USDT"):
         """
         初始化策略引擎
 
         Args:
             config: 策略配置参数
+            symbol: 交易对符号
         """
         self.config = config or self._get_default_config()
+        self.symbol = symbol
+
+        # 初始化资金费率监控器
+        self.funding_rate_monitor = FundingRateMonitor(self.config)
+
+        # 初始化多空比监控器
+        self.ls_ratio_monitor = LongShortRatioMonitor(self.config)
 
     @staticmethod
     def _get_default_config() -> dict:
@@ -71,6 +81,18 @@ class TradingStrategy:
             'buy_score_threshold': 60,
             'sell_score_threshold': -60,
             'strong_signal_threshold': 80,
+
+            # 资金费率阈值
+            'funding_rate_overbought': 0.001,  # 0.1%
+            'funding_rate_oversold': -0.001,   # -0.1%
+            'funding_rate_extreme': 0.002,     # 0.2%
+            'funding_rate_weight': 15,         # 资金费率评分权重
+
+            # 多空比阈值
+            'extreme_long_ratio': 3.0,         # 多空比>3:1警告
+            'extreme_short_ratio': 0.33,       # 多空比<1:3警告
+            'crowded_threshold': 2.5,          # 拥挤阈值
+            'long_short_ratio_weight': 10,     # 多空比评分权重
         }
 
     def analyze(self, df: pd.DataFrame, index: int) -> Dict:
@@ -236,8 +258,28 @@ class TradingStrategy:
         else:
             scores['trend'] = 0  # 震荡
 
-        # 计算总分
-        total_score = sum(scores.values())
+        # 7. 资金费率得分 (-15 到 15)
+        try:
+            funding_score, funding_desc = self.funding_rate_monitor.get_funding_rate_score(self.symbol)
+            scores['funding_rate'] = funding_score
+            scores['funding_rate_desc'] = funding_desc
+        except Exception as e:
+            logger.warning(f"获取资金费率失败: {e}")
+            scores['funding_rate'] = 0
+            scores['funding_rate_desc'] = "资金费率数据不可用"
+
+        # 8. 多空比得分 (-10 到 10)
+        try:
+            ls_ratio_score, ls_ratio_desc = self.ls_ratio_monitor.get_ls_ratio_score(self.symbol)
+            scores['long_short_ratio'] = ls_ratio_score
+            scores['long_short_ratio_desc'] = ls_ratio_desc
+        except Exception as e:
+            logger.warning(f"获取多空比失败: {e}")
+            scores['long_short_ratio'] = 0
+            scores['long_short_ratio_desc'] = "多空比数据不可用"
+
+        # 计算总分（排除描述字段）
+        total_score = sum(v for k, v in scores.items() if not k.endswith('_desc'))
 
         return {
             'total_score': total_score,
@@ -277,6 +319,10 @@ class TradingStrategy:
                 reasons.append("放量上涨")
             if trend == TrendType.UPTREND:
                 reasons.append("趋势向上")
+            if score_details['details'].get('funding_rate', 0) > 10:
+                reasons.append("资金费率超卖（空头支付多头）")
+            if score_details['details'].get('long_short_ratio', 0) > 5:
+                reasons.append("多空比极低（空头拥挤）")
 
         elif total_score <= self.config['sell_score_threshold']:
             signal_type = SignalType.SELL
@@ -294,6 +340,10 @@ class TradingStrategy:
                 reasons.append("放量下跌")
             if trend == TrendType.DOWNTREND:
                 reasons.append("趋势向下")
+            if score_details['details'].get('funding_rate', 0) < -10:
+                reasons.append("资金费率超买（多头支付空头）")
+            if score_details['details'].get('long_short_ratio', 0) < -5:
+                reasons.append("多空比极高（多头拥挤）")
 
         else:
             signal_type = SignalType.HOLD
