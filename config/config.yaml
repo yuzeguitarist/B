@@ -1,0 +1,137 @@
+# 币安自动交易策略回测系统配置文件
+
+# ========== 基础配置 ==========
+# 交易对
+symbol: "BTC/USDT"
+
+# K线周期 (1m=1分钟, 5m=5分钟, 15m=15分钟, 1h=1小时)
+timeframe: "1m"
+
+# 回测时长（小时）
+hours: 72
+
+# 币安API配置（获取历史数据不需要API密钥，留空即可）
+api_key: ""
+api_secret: ""
+
+# ========== 数据配置 ==========
+# 是否使用本地数据（如果为true，则从本地文件读取，不调用API）
+use_local_data: false
+
+# 本地数据文件路径（仅当use_local_data=true时使用）
+local_data_file: "data/btc_usdt_1m.csv"
+
+# 是否保存原始数据
+save_raw_data: true
+
+# ========== 交易配置 ==========
+trading:
+  # 初始资金（USDT）
+  initial_capital: 1000
+
+  # 手续费率（币安现货Maker/Taker费率约0.1%）
+  fee_rate: 0.001
+
+  # 滑点率（市价单滑点约0.05%）
+  slippage_rate: 0.0005
+
+  # 最小交易金额（USDT）
+  min_trade_amount: 10
+
+  # 最大仓位比例（0-1，建议不超过0.95）
+  max_position_percent: 0.95
+
+  # 止损百分比（2%止损）
+  stop_loss_percent: 0.02
+
+  # 止盈百分比（5%止盈）
+  take_profit_percent: 0.05
+
+  # 是否使用移动止损
+  use_trailing_stop: false
+
+  # 最大持仓时间（分钟，240分钟=4小时）
+  max_holding_minutes: 240
+
+# ========== 策略配置 ==========
+strategy:
+  # RSI阈值
+  rsi_oversold: 30          # RSI超卖线
+  rsi_overbought: 70        # RSI超买线
+  rsi_strong_oversold: 20   # RSI强超卖线
+  rsi_strong_overbought: 80 # RSI强超买线
+
+  # KDJ阈值
+  kdj_oversold: 20
+  kdj_overbought: 80
+
+  # Williams %R阈值
+  williams_oversold: -80
+  williams_overbought: -20
+
+  # 成交量阈值（放量阈值，1.5倍于均值）
+  volume_ratio_threshold: 1.5
+
+  # 布林带突破阈值
+  bb_breakout_threshold: 0.02
+
+  # 综合得分阈值
+  buy_score_threshold: 60   # 买入信号阈值
+  sell_score_threshold: -60 # 卖出信号阈值
+  strong_signal_threshold: 80 # 强信号阈值
+
+# ========== 技术指标配置 ==========
+indicators:
+  # EMA周期（支持多个）
+  ema_periods: [7, 25, 99]
+
+  # MACD参数
+  macd_fast: 12
+  macd_slow: 26
+  macd_signal: 9
+
+  # 布林带参数
+  bb_period: 20
+  bb_std: 2
+
+  # RSI周期
+  rsi_period: 14
+
+  # KDJ参数
+  kdj_period: 9
+  kdj_smooth_k: 3
+  kdj_smooth_d: 3
+
+  # Williams %R周期
+  williams_period: 14
+
+  # 成交量均线周期
+  volume_ma_period: 20
+
+  # 支撑阻力位周期
+  sr_period: 20
+
+# ========== 风险控制配置 ==========
+risk:
+  # 单日最大亏损限制（5%）
+  max_daily_loss_percent: 0.05
+
+  # 连续亏损熔断次数
+  max_consecutive_losses: 3
+
+  # 急跌保护阈值（5分钟内下跌5%触发）
+  flash_crash_threshold: 0.05
+  flash_crash_period: 5
+
+  # 最大回撤限制（10%）
+  max_drawdown_percent: 0.10
+
+# ========== 输出配置 ==========
+# 输出目录
+output_dir: "./results"
+
+# 日志级别 (DEBUG, INFO, WARNING, ERROR)
+log_level: "INFO"
+
+# 是否绘制图表（需要安装matplotlib）
+plot_charts: true
