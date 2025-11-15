@@ -36,22 +36,29 @@ class TrendType(Enum):
 class TradingStrategy:
     """交易策略决策引擎"""
 
-    def __init__(self, config: dict = None, symbol: str = "BTC/USDT"):
+    def __init__(self, config: dict = None, symbol: str = "BTC/USDT", enable_live_data: bool = False):
         """
         初始化策略引擎
 
         Args:
             config: 策略配置参数
             symbol: 交易对符号
+            enable_live_data: 是否启用实时数据（资金费率、多空比）
+                             回测时应设为False，实盘时可设为True
         """
         self.config = config or self._get_default_config()
         self.symbol = symbol
+        self.enable_live_data = enable_live_data
 
-        # 初始化资金费率监控器
-        self.funding_rate_monitor = FundingRateMonitor(self.config)
-
-        # 初始化多空比监控器
-        self.ls_ratio_monitor = LongShortRatioMonitor(self.config)
+        # 初始化资金费率监控器（仅在启用实时数据时）
+        if enable_live_data:
+            self.funding_rate_monitor = FundingRateMonitor(self.config)
+            self.ls_ratio_monitor = LongShortRatioMonitor(self.config)
+            logger.info("实时数据已启用（资金费率、多空比）")
+        else:
+            self.funding_rate_monitor = None
+            self.ls_ratio_monitor = None
+            logger.info("实时数据已禁用（回测模式）")
 
     @staticmethod
     def _get_default_config() -> dict:
@@ -259,24 +266,34 @@ class TradingStrategy:
             scores['trend'] = 0  # 震荡
 
         # 7. 资金费率得分 (-15 到 15)
-        try:
-            funding_score, funding_desc = self.funding_rate_monitor.get_funding_rate_score(self.symbol)
-            scores['funding_rate'] = funding_score
-            scores['funding_rate_desc'] = funding_desc
-        except Exception as e:
-            logger.warning(f"获取资金费率失败: {e}")
+        # 仅在启用实时数据时获取
+        if self.enable_live_data and self.funding_rate_monitor:
+            try:
+                funding_score, funding_desc = self.funding_rate_monitor.get_funding_rate_score(self.symbol)
+                scores['funding_rate'] = funding_score
+                scores['funding_rate_desc'] = funding_desc
+            except Exception as e:
+                logger.warning(f"获取资金费率失败: {e}")
+                scores['funding_rate'] = 0
+                scores['funding_rate_desc'] = "资金费率获取失败"
+        else:
             scores['funding_rate'] = 0
-            scores['funding_rate_desc'] = "资金费率数据不可用"
+            scores['funding_rate_desc'] = "资金费率数据已禁用（回测模式）"
 
         # 8. 多空比得分 (-10 到 10)
-        try:
-            ls_ratio_score, ls_ratio_desc = self.ls_ratio_monitor.get_ls_ratio_score(self.symbol)
-            scores['long_short_ratio'] = ls_ratio_score
-            scores['long_short_ratio_desc'] = ls_ratio_desc
-        except Exception as e:
-            logger.warning(f"获取多空比失败: {e}")
+        # 仅在启用实时数据时获取
+        if self.enable_live_data and self.ls_ratio_monitor:
+            try:
+                ls_ratio_score, ls_ratio_desc = self.ls_ratio_monitor.get_ls_ratio_score(self.symbol)
+                scores['long_short_ratio'] = ls_ratio_score
+                scores['long_short_ratio_desc'] = ls_ratio_desc
+            except Exception as e:
+                logger.warning(f"获取多空比失败: {e}")
+                scores['long_short_ratio'] = 0
+                scores['long_short_ratio_desc'] = "多空比获取失败"
+        else:
             scores['long_short_ratio'] = 0
-            scores['long_short_ratio_desc'] = "多空比数据不可用"
+            scores['long_short_ratio_desc'] = "多空比数据已禁用（回测模式）"
 
         # 计算总分（排除描述字段）
         total_score = sum(v for k, v in scores.items() if not k.endswith('_desc'))

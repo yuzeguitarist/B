@@ -38,9 +38,8 @@ class FundingRateMonitor:
         self.oversold_threshold = self.config.get('funding_rate_oversold', -0.001)  # -0.1%
         self.extreme_threshold = self.config.get('funding_rate_extreme', 0.002)  # 0.2%
 
-        # 缓存
-        self.last_funding_rate = None
-        self.last_update_time = None
+        # 缓存（按symbol分别缓存）
+        self.cache = {}  # {symbol: {'rate': float, 'time': datetime}}
         self.cache_duration = 300  # 缓存5分钟
 
     @staticmethod
@@ -69,9 +68,10 @@ class FundingRateMonitor:
             return None
 
         # 检查缓存
-        if self._use_cache():
-            logger.debug(f"使用缓存的资金费率: {self.last_funding_rate}")
-            return self.last_funding_rate
+        if self._use_cache(symbol):
+            cached_rate = self.cache[symbol]['rate']
+            logger.debug(f"使用缓存的{symbol}资金费率: {cached_rate}")
+            return cached_rate
 
         try:
             # 转换为期货交易对格式
@@ -85,9 +85,11 @@ class FundingRateMonitor:
 
             funding_rate = float(funding_info['lastFundingRate'])
 
-            # 更新缓存
-            self.last_funding_rate = funding_rate
-            self.last_update_time = datetime.now()
+            # 更新缓存（按symbol存储）
+            self.cache[symbol] = {
+                'rate': funding_rate,
+                'time': datetime.now()
+            }
 
             logger.info(f"{symbol} 当前资金费率: {funding_rate:.6f} ({funding_rate*100:.4f}%)")
 
@@ -97,12 +99,12 @@ class FundingRateMonitor:
             logger.error(f"获取资金费率失败: {e}")
             return None
 
-    def _use_cache(self) -> bool:
+    def _use_cache(self, symbol: str) -> bool:
         """检查是否使用缓存数据"""
-        if self.last_funding_rate is None or self.last_update_time is None:
+        if symbol not in self.cache:
             return False
 
-        elapsed = (datetime.now() - self.last_update_time).total_seconds()
+        elapsed = (datetime.now() - self.cache[symbol]['time']).total_seconds()
         return elapsed < self.cache_duration
 
     def analyze_funding_rate(self, funding_rate: float) -> Dict:
@@ -181,6 +183,11 @@ class FundingRateMonitor:
         funding_rate = self.get_funding_rate(symbol)
         analysis = self.analyze_funding_rate(funding_rate)
 
+        # 应用权重（注意：权重已经在默认配置中定义为15，这里直接使用analysis的score）
+        # analysis['score']的范围已经是 -20到20，这里返回时不需要再乘以权重
+        # 因为在策略评分系统中已经设计好了各个指标的权重
+        score = analysis['score']
+
         # 生成说明文本
         if analysis['warning']:
             description = analysis['warning']
@@ -190,7 +197,7 @@ class FundingRateMonitor:
             else:
                 description = "无资金费率数据"
 
-        return analysis['score'], description
+        return score, description
 
     def get_next_funding_time(self, symbol: str) -> Optional[datetime]:
         """

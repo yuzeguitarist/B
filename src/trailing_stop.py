@@ -212,6 +212,11 @@ class MultiLevelTrailingStop:
         Returns:
             (止损价格, 是否触发, 说明)
         """
+        # 检查是否已初始化
+        if self.highest_price is None or self.trailing_stop_price is None:
+            logger.error("多级移动止损未初始化，请先调用initialize()")
+            return entry_price * 0.98, False, "多级移动止损未初始化"
+
         # 更新最高价
         if current_price > self.highest_price:
             self.highest_price = current_price

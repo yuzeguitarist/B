@@ -77,6 +77,11 @@ class PartialProfitManager:
         if self.remaining_quantity <= 0:
             return None, None, "已无剩余持仓"
 
+        # 检查入场价格有效性
+        if entry_price <= 0:
+            logger.error(f"无效的入场价格: {entry_price}")
+            return None, None, "入场价格无效"
+
         # 计算当前盈利百分比
         profit_percent = (current_price - entry_price) / entry_price
 

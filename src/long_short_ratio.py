@@ -215,9 +215,11 @@ class LongShortRatioMonitor:
             signal = '观望'
             # 在 0.5 到 2.0 之间线性映射到 -3 到 3
             if ls_ratio > 1.0:
-                score = min(3, (ls_ratio - 1.0) / 0.5 * -3)
+                # 多头占优，返回负分，用max确保不低于-3
+                score = max(-3, (ls_ratio - 1.0) / 0.5 * -3)
             else:
-                score = max(-3, (1.0 - ls_ratio) / 0.5 * 3)
+                # 空头占优，返回正分，用min确保不超过3
+                score = min(3, (1.0 - ls_ratio) / 0.5 * 3)
             warning = None
             crowded = False
 
@@ -391,7 +393,10 @@ if __name__ == "__main__":
     # 综合分析
     print("\n===== 综合情绪分析 =====")
     sentiment = monitor.analyze_market_sentiment(symbol)
-    print(f"账户多空比: {sentiment['account_ratio']:.2f}:1 ({sentiment['account_sentiment']})")
+    if sentiment['account_ratio'] is not None:
+        print(f"账户多空比: {sentiment['account_ratio']:.2f}:1 ({sentiment['account_sentiment']})")
+    else:
+        print(f"账户多空比: 无数据 ({sentiment['account_sentiment']})")
     if sentiment['top_ratio_data']:
         print(f"大户多空比: {sentiment['top_ratio_data']['top_ls_ratio']:.2f}:1")
     print(f"综合评分: {sentiment['total_score']:.2f}")
