@@ -6,8 +6,8 @@ import numpy as np
 from typing import Dict, Tuple, Optional
 from enum import Enum
 import logging
-from .funding_rate import FundingRateMonitor
-from .long_short_ratio import LongShortRatioMonitor
+from funding_rate import FundingRateMonitor
+from long_short_ratio import LongShortRatioMonitor
 
 logger = logging.getLogger(__name__)
 
