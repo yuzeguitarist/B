@@ -16,10 +16,10 @@ api_secret: ""
 
 # ========== 数据配置 ==========
 # 是否使用本地数据（如果为true，则从本地文件读取，不调用API）
-use_local_data: false
+use_local_data: true
 
 # 本地数据文件路径（仅当use_local_data=true时使用）
-local_data_file: "data/btc_usdt_1m.csv"
+local_data_file: "data/raw_BTC_USDT_20251116_190141.csv"
 
 # 是否保存原始数据
 save_raw_data: true

@@ -346,19 +346,30 @@ class TradingSimulator:
 
     def get_performance_stats(self) -> Dict:
         """获取绩效统计"""
-        if self.total_trades == 0:
-            return {
-                'total_trades': 0,
-                'win_rate': 0,
-                'total_return': 0,
-                'max_drawdown': 0
-            }
+        final_capital = self.cash
+        total_return = (
+            (final_capital - self.initial_capital) / self.initial_capital * 100
+            if self.initial_capital > 0 else 0
+        )
 
-        # 计算总收益率
-        total_return = (self.cash - self.initial_capital) / self.initial_capital * 100
+        stats = {
+            'initial_capital': self.initial_capital,
+            'final_capital': final_capital,
+            'total_return': total_return,
+            'total_trades': self.total_trades,
+            'winning_trades': self.winning_trades,
+            'losing_trades': self.losing_trades,
+            'win_rate': 0,
+            'profit_factor': 0,
+            'max_drawdown': self.max_drawdown,
+            'avg_holding_time': 0
+        }
+
+        if self.total_trades == 0:
+            return stats
 
         # 胜率
-        win_rate = self.winning_trades / self.total_trades * 100 if self.total_trades > 0 else 0
+        win_rate = self.winning_trades / self.total_trades * 100
 
         # 盈亏比
         winning_pnl = sum([t['pnl'] for t in self.trade_history if t.get('pnl', 0) > 0])
@@ -369,18 +380,13 @@ class TradingSimulator:
         holding_times = [t['holding_time'] for t in self.trade_history if 'holding_time' in t]
         avg_holding_time = sum(holding_times) / len(holding_times) if holding_times else 0
 
-        return {
-            'initial_capital': self.initial_capital,
-            'final_capital': self.cash,
-            'total_return': total_return,
-            'total_trades': self.total_trades,
-            'winning_trades': self.winning_trades,
-            'losing_trades': self.losing_trades,
+        stats.update({
             'win_rate': win_rate,
             'profit_factor': profit_factor,
-            'max_drawdown': self.max_drawdown,
             'avg_holding_time': avg_holding_time
-        }
+        })
+
+        return stats
 
 
 if __name__ == "__main__":
